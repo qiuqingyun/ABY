@@ -82,7 +82,7 @@ void read_test_options(int32_t *argcp, char ***argvp, e_role *role, std::string 
                        uint32_t *dimension, uint32_t *bitlen, uint32_t *secparam, std::string *address,
                        uint16_t *port, int32_t *test_op, uint32_t *test_bit)
 {
-    uint32_t int_role = 0, int_port = 0, int_testbit = 0, int_dimension = 2, int_sharing = 0;
+    uint32_t int_role = 0, int_port = 0, int_testbit = 0, int_dimension = 2, int_sharing = 2;
     std::string str_path;
     parsing_ctx options[] =
         {{(void *)&int_role, T_NUM, "r", "Role: 0/1", true, false},

@@ -275,7 +275,7 @@ void eDistance(std::vector<uint64_t *> list, std::vector<uint32_t *> centers, st
         {
             if (!errorCount--)
             {
-                printf("Wrong!\n");
+                printf("Program error!\n");
                 exit(0);
             }
             iL--;
