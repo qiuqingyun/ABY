@@ -282,22 +282,18 @@ void kmeans(e_role role, uint32_t dimension, uint32_t cluster, std::string path,
 {
     std::vector<std::vector<uint64_t>> list; //数据向量,所有明文加密数据保存于此
     dataIn(list, dimension, path);           //输入文件
-    
-
     std::vector<uint32_t> classInfo; //数据分类信息
     //数据初始化，随机分类
     srand((unsigned)20); //应随机生成后共享
-    for (uint32_t i = 0; i < dimension * 2; i++)
-        classInfo.push_back(i % dimension);
-    for (int i = dimension * 2; i < list[0].size(); i++)
-        classInfo.push_back(rand() % dimension);
+    for (uint32_t i = 0; i < cluster * 2; i++)
+        classInfo.push_back(i % cluster);
+    for (int i = cluster * 2; i < list[0].size(); i++)
+        classInfo.push_back(rand() % cluster);
 
     std::vector<uint32_t *> centers;    //质心向量
     std::vector<uint32_t *> oldCenters; //上一轮的质心向量
     for (int i = 0; i < cluster; i++)
     { //初始化填充
-        // uint32_t *temp1 = (uint32_t *)malloc(sizeof(uint32_t) * dimension);
-        // uint32_t *temp2 = (uint32_t *)malloc(sizeof(uint32_t) * dimension);
         uint32_t *temp1=new uint32_t [dimension];
         uint32_t *temp2=new uint32_t [dimension];
         for (int j = 0; j < dimension; j++)
