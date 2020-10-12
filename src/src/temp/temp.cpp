@@ -64,8 +64,27 @@ void test_euclid_dist_circuit(e_role role, const std::string &address, uint16_t 
     ArithmeticCircuit *ac = (ArithmeticCircuit *)sharings[S_ARITH]->GetCircuitBuildRoutine();
     Circuit *yc = sharings[S_YAO]->GetCircuitBuildRoutine();
     BooleanCircuit *bc = (BooleanCircuit *)sharings[S_BOOL]->GetCircuitBuildRoutine();
+    //测试浮点数转换门
 
-    srand((unsigned)100);
+    uint32_t sum = 84543;
+    uint32_t counts = 19;
+
+    uint32_t shiftN = 20;
+    counts = (float)pow((float)2,(float)shiftN) / counts*100;//将除数转换为倒数，放大为整数，放大倍数足够大保证精度
+    share *s_sum = ac->PutINGate((uint64_t)sum, bitlen, SERVER);
+
+    share *s_counts = ac->PutCONSGate((uint64_t)counts, bitlen);//将簇中数据点个数加密
+
+    share *s_divAns = ac->PutMULGate(s_sum, s_counts);//乘法代替除法
+    share *s_divAns_b = bc->PutA2BGate(s_divAns, yc);//转换为布尔电路
+    share *s_shiftN = bc->PutINGate((uint64_t)shiftN, 64, SERVER);
+    share *s_shiftedR = bc->PutBarrelRightShifterGate(s_divAns_b, s_shiftN);//对结果进行右移处理，保留小数点后两位
+    share *s_out = bc->PutSharedOUTGate(s_shiftedR);//以share后的加密明文输出，保存结果
+    party->ExecCircuit();
+    uint64_t out = s_out->get_clear_value<uint64_t>();
+    
+    std::cout << "div_share:" << out << std::endl;
+    /* srand((unsigned)100);
     uint64_t res = 0, oldRes = 0;
     nvals = 0; //数据个数
     int counts = 0;
@@ -261,7 +280,7 @@ void test_euclid_dist_circuit(e_role role, const std::string &address, uint16_t 
         // else
         //     oldRes = res;
         // party->Reset();
-    }
+    } */
     delete party;
     // std::cout << "The result is:\t" << counts << std::endl;
 }

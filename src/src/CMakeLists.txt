@@ -9,4 +9,5 @@
 #add_subdirectory(userSim)
 #add_subdirectory(kmeans1)
 #add_subdirectory(kmeans2)
-add_subdirectory(kmeans3)
+#add_subdirectory(kmeans3)
+add_subdirectory(kmeans4)

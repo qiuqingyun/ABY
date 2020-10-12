@@ -150,16 +150,15 @@ void findCenters(std::vector<std::vector<uint64_t>> list, std::vector<uint64_t *
             //累加结果乘以数据点个数的倒数
             //计算得到的质心坐标放大100倍后截断取整,保留小数点后两位
             counts = (float)pow((float)2, (float)shiftN) / counts * 100; //将除数转换为倒数，放大为整数，放大倍数足够大保证精度
-            share *s_shiftN = bc->PutINGate((uint64_t)shiftN, 64, SERVER);
-            share *s_counts = ac->PutCONSGate((uint64_t)counts, bitlen);             //将簇中数据点个数加密
-            share *s_divAns = ac->PutMULGate(s_sum, s_counts);                       //乘法代替除法
-            share *s_divAns_b = bc->PutA2BGate(s_divAns, yc);                        //转换为布尔电路
-            share *s_shiftedR = bc->PutBarrelRightShifterGate(s_divAns_b, s_shiftN); //对结果进行右移处理，保留小数点后两位
-            share *s_out = bc->PutSharedOUTGate(s_shiftedR);                         //以share后的加密明文输出，保存结果
-
+            share *s_shiftN_b = bc->PutINGate((uint64_t)shiftN, 64, SERVER);
+            share *s_counts_a = ac->PutCONSGate((uint64_t)counts, bitlen);               //将簇中数据点个数加密
+            share *s_divAns_a = ac->PutMULGate(s_sum, s_counts_a);                       //乘法代替除法
+            share *s_divAns_b = bc->PutA2BGate(s_divAns_a, yc);                          //转换为布尔电路
+            share *s_shiftedR_b = bc->PutBarrelRightShifterGate(s_divAns_b, s_shiftN_b); //对结果进行右移处理，保留小数点后两位
+            share *s_shiftedR_a = ac->PutB2AGate(s_shiftedR_b);                          //转换为算数电路
+            share *s_out_a = ac->PutSharedOUTGate(s_shiftedR_a);                         //以share后的加密明文输出，保存结果
             party->ExecCircuit();
-            uint64_t out = s_out->get_clear_value<uint64_t>();
-
+            uint64_t out = s_out_a->get_clear_value<uint64_t>();
             oldCenters[iC][iD] = centers[iC][iD]; //保存上一次的质心
             centers[iC][iD] = out;                //更新质心
             party->Reset();                       //重置电路
@@ -179,8 +178,8 @@ void eDistance(std::vector<std::vector<uint64_t>> list, std::vector<uint64_t *> 
     BooleanCircuit *bc = (BooleanCircuit *)sharings[S_BOOL]->GetCircuitBuildRoutine();
     Circuit *yc = sharings[S_YAO]->GetCircuitBuildRoutine();
 
-    share *s_dis[2], *s_inx[2];
-    int nvals = list[0].size();
+    // share *s_dis[2], *s_inx[2];
+    uint32_t nvals = list[0].size();
     int counts = 0;
     uint64_t zero = 0, max = ULONG_MAX, hundred = 100;
     // share *s_minIndex,*s_minIndex;
@@ -191,16 +190,14 @@ void eDistance(std::vector<std::vector<uint64_t>> list, std::vector<uint64_t *> 
     {
         share *s_addAns_a = ac->PutSIMDCONSGate(nvals, zero, bitlen);
         for (int iD = 0; iD < dimension; iD++)
-        {                                                                                     //对每个维度,(x2-x1)*(x2-x1)
-            share *s_dataPoint_a = ac->PutSharedSIMDINGate(nvals, &list[iD][0], bitlen);      //输入数据点
-            s_dataPoint_a = ac->PutMULGate(s_dataPoint_a, s_cons_100_a);                      //数据点配合质心，放大100倍,AC
-            share *s_centerPoint_a = ac->PutSharedSIMDINGate(nvals, centers[iC][iD], bitlen); //输入质心
-            printf("nvals:%u\n",s_centerPoint_a->get_nvals());
-            press();
+        {                                                                                //对每个维度,(x2-x1)*(x2-x1)
+            share *s_dataPoint_a = ac->PutSharedSIMDINGate(nvals, &list[iD][0], bitlen); //输入数据点
+            s_dataPoint_a = ac->PutMULGate(s_dataPoint_a, s_cons_100_a);                 //数据点配合质心，放大100倍,AC
+            share *s_centerPoint_a = ac->PutSharedINGate(centers[iC][iD], bitlen);       //输入质心
+            s_centerPoint_a = ac->PutRepeaterGate(nvals, s_centerPoint_a);               //转换为SIMD
+
             share *s_dataPoint_b = bc->PutA2BGate(s_dataPoint_a, yc);
             share *s_centerPoint_b = bc->PutA2BGate(s_centerPoint_a, yc);
-            // ac->PutPrintValueGate(s_dataPoint_a, "dataPoint\t");
-            // ac->PutPrintValueGate(s_centerPoint_a, "centerPoint\t");
             //保证结果为正
             share *check_sel_b = bc->PutGTGate(s_dataPoint_b, s_centerPoint_b);             //BC
             share *check_sel_inv_b = bc->PutINVGate(check_sel_b);                           //BC
@@ -223,29 +220,34 @@ void eDistance(std::vector<std::vector<uint64_t>> list, std::vector<uint64_t *> 
         share *check_ans_b = bc->PutGTGate(s_addAns_b, s_minDis_b);          //BC
         s_minDis_b = bc->PutMUXGate(s_minDis_b, s_addAns_b, check_ans_b);    //小的数,BC
         s_minIndex_b = bc->PutMUXGate(s_minIndex_b, s_index_b, check_ans_b); //小的序号,BC
-        s_dis[iC] = s_minDis_b;
-        s_inx[iC] = s_minIndex_b;
+        // s_dis[iC] = s_minDis_b;
+        // s_inx[iC] = s_minIndex_b;
     }
-    share *s_minDis_out = bc->PutOUTGate(s_minDis_b, ALL);
-    share *s_minIndex_out = bc->PutOUTGate(s_minIndex_b, ALL);
-    share *s_out_dis1 = bc->PutOUTGate(s_dis[0], ALL);
-    share *s_out_dis2 = bc->PutOUTGate(s_dis[1], ALL);
-    share *s_out_inx1 = bc->PutOUTGate(s_inx[0], ALL);
-    share *s_out_inx2 = bc->PutOUTGate(s_inx[1], ALL);
+    share *s_minDis_a = ac->PutB2AGate(s_minDis_b);
+    share *s_minIndex_a = ac->PutB2AGate(s_minIndex_b);
+    share *s_minDis_out = ac->PutOUTGate(s_minDis_a, ALL);
+    share *s_minIndex_out = ac->PutOUTGate(s_minIndex_a, ALL);
+    // share *s_out_dis1 = bc->PutOUTGate(s_dis[0], ALL);
+    // share *s_out_dis2 = bc->PutOUTGate(s_dis[1], ALL);
+    // share *s_out_inx1 = bc->PutOUTGate(s_inx[0], ALL);
+    // share *s_out_inx2 = bc->PutOUTGate(s_inx[1], ALL);
 
     party->ExecCircuit();
 
     uint32_t out_bitlen, out_nvals, minIndex, oldIndex;
     uint32_t *output_dis, *output_index;
-    uint32_t *output_dis1, *output_index1;
-    uint32_t *output_dis2, *output_index2;
+    // uint32_t *output_dis1, *output_index1;
+    // uint32_t *output_dis2, *output_index2;
+
     s_minDis_out->get_clear_value_vec(&output_dis, &out_bitlen, &out_nvals);
     s_minIndex_out->get_clear_value_vec(&output_index, &out_bitlen, &out_nvals);
+    // uint8_t *minDis_out = s_minDis_out->get_clear_value_ptr();
+    // uint8_t *minIndex_out = s_minIndex_out->get_clear_value_ptr();
 
-    s_out_dis1->get_clear_value_vec(&output_dis1, &out_bitlen, &out_nvals);
-    s_out_dis2->get_clear_value_vec(&output_dis2, &out_bitlen, &out_nvals);
-    s_out_inx1->get_clear_value_vec(&output_index1, &out_bitlen, &out_nvals);
-    s_out_inx2->get_clear_value_vec(&output_index2, &out_bitlen, &out_nvals);
+    // s_out_dis1->get_clear_value_vec(&output_dis1, &out_bitlen, &out_nvals);
+    // s_out_dis2->get_clear_value_vec(&output_dis2, &out_bitlen, &out_nvals);
+    // s_out_inx1->get_clear_value_vec(&output_index1, &out_bitlen, &out_nvals);
+    // s_out_inx2->get_clear_value_vec(&output_index2, &out_bitlen, &out_nvals);
 
     for (int iL = 0; iL < list[0].size(); iL++)
     {
@@ -257,27 +259,47 @@ void eDistance(std::vector<std::vector<uint64_t>> list, std::vector<uint64_t *> 
     }
     printf("\n%d points changed.\n", counts);
     delete party;
-    printf("ok\n");
     // press();
 }
 
 //与上一轮相比质心的移动,若每个维度均小于临界值，则退出
-uint32_t minDis(std::vector<uint64_t *> centers, std::vector<uint64_t *> oldCenters,
-                uint32_t dimension, uint32_t diff)
+uint32_t minDis(std::vector<uint64_t *> centers, std::vector<uint64_t *> oldCenters, uint32_t diff,
+                e_role role, uint32_t dimension, const std::string &address, uint16_t port, seclvl seclvl,
+                uint32_t bitlen, uint32_t nthreads, e_mt_gen_alg mt_alg)
 {
+    ABYParty *party = new ABYParty(role, address, port, seclvl, bitlen, nthreads, mt_alg, 4000000);
+    std::vector<Sharing *> &sharings = party->GetSharings();
+    ArithmeticCircuit *ac = (ArithmeticCircuit *)sharings[S_ARITH]->GetCircuitBuildRoutine();
+    BooleanCircuit *bc = (BooleanCircuit *)sharings[S_BOOL]->GetCircuitBuildRoutine();
+    Circuit *yc = sharings[S_YAO]->GetCircuitBuildRoutine();
+
     uint32_t flag = 1, ans;
     // std::cout << "diff " << diff << "\tans";
     for (int iC = 0; iC < centers.size(); iC++) //对每个簇
         for (int iD = 0; iD < dimension; iD++)  //对每个维度
         {
-            if (centers[iC][iD] > oldCenters[iC][iD])
-                ans = centers[iC][iD] - oldCenters[iC][iD];
-            else
-                ans = oldCenters[iC][iD] - centers[iC][iD];
-            flag = flag && (ans <= diff);
+            share *center_a = ac->PutSharedINGate(centers[iC][iD], bitlen);
+            share *oldCenter_a = ac->PutSharedINGate(oldCenters[iC][iD], bitlen);
+            share *center_b = bc->PutA2BGate(center_a, yc);
+            share *oldCenter_b = bc->PutA2BGate(oldCenter_a, yc);
+
+            share *check_sel_b = bc->PutGTGate(center_b, oldCenter_b);             //BC
+            share *check_sel_inv_b = bc->PutINVGate(check_sel_b);                  //BC
+            share *t_a_b = bc->PutMUXGate(center_b, oldCenter_b, check_sel_b);     //大的数,BC
+            share *t_b_b = bc->PutMUXGate(center_b, oldCenter_b, check_sel_inv_b); //小的数,BC
+            share *s_sub_b = bc->PutSUBGate(t_a_b, t_b_b);                         //AC,SUB
+            share *s_diff_b = bc->PutCONSGate((uint64_t)diff, bitlen);
+
+            check_sel_b = bc->PutGTGate(s_diff_b, s_sub_b);
+            share *s_out = bc->PutOUTGate(check_sel_b, ALL);
+            party->ExecCircuit();
+            uint32_t ans = s_out->get_clear_value<uint32_t>();
+            flag = flag && ans;
+            party->Reset();
             // std::cout << "\t" << ans;
         }
     // std::cout << "\tFLAG: " << flag << std::endl;
+    delete party;
     return flag ? 0 : 1; //每个维度均小于临界值，则返回0
 }
 
@@ -318,13 +340,17 @@ void kmeans(e_role role, uint32_t dimension, uint32_t cluster, std::string path,
         findCenters(list, centers, classInfo, oldCenters, cluster, role, dimension, address, port, seclvl, bitlen, nthreads, mt_alg);
         //与上一轮相比质心的移动,若每个维度均小于临界值，则退出
         printf("Round%d: Find centers!\n", times);
-        flag = minDis(centers, oldCenters, dimension, diff);
+        flag = minDis(centers, oldCenters, diff, role, dimension, address, port, seclvl, bitlen, nthreads, mt_alg);
         if (!flag)
+        {
+            printf("Cluster completed!\n");
             break;
+        }
         //每个数据点找到与自己欧氏距离最近的质心，并归类
+        printf("Calculating...");
+        fflush(stdout);
         eDistance(list, centers, classInfo, role, dimension, address, port, seclvl, bitlen, nthreads, mt_alg);
-        printf("                     \r");
-        printf("Calculating is complete!\nRound%d: finished!\n", times);
+        printf("Calculation completed!\n");
         end = clock();
         clock_t remain = (double)(end - start) / CLOCKS_PER_SEC;
         std::cout << "Time is " << remain / 60 << "m " << remain % 60 << "s" << std::endl;
@@ -332,7 +358,8 @@ void kmeans(e_role role, uint32_t dimension, uint32_t cluster, std::string path,
         // press();
     }
     //输出结果
-    printf("\n");
+    printf("\nPrinting...");
+    fflush(stdout);
     int index = 0;
     std::string fileName = role ? BOB : ALICE;
     char *namePtr = const_cast<char *>(fileName.c_str());
@@ -343,18 +370,10 @@ void kmeans(e_role role, uint32_t dimension, uint32_t cluster, std::string path,
         exit(0);
     }
     // printf("print out");
-    for (int iL = 0; iL < list[0].size(); iL++)
-    { //对每个数
-        for (int iC = 0; iC < cluster; iC++)
-        { //对每个簇
-            if (classInfo[iL] == iC)
-            { //如果属于这个簇
-                fprintf(fp, "USER %d:\tCLASS %d\n", ++index, iC);
-                // std::cout << "." << std::flush;                                                     //进度条
-            }
-        }
-        std::cout << "Printing  " << (float)iL / list[0].size() * 100 << "%\r" << std::flush; //进度条
-    }
+    for (int iL = 0; iL < list[0].size(); iL++)                   //对每个数
+        for (int iC = 0; iC < cluster; iC++)                      //对每个簇
+            if (classInfo[iL] == iC)                              //如果属于这个簇
+                fprintf(fp, "USER %d:\tCLASS %d\n", ++index, iC); //输出该数据点所属的簇编号
     fclose(fp);
     printf("Printing is complete!\n");
 }

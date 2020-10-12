@@ -18,33 +18,32 @@
 #define ALICE "ALICE"
 #define BOB "BOB"
 
+
 //将明文数据转换为share数据，并以加密的明文形式保存
 void aby(e_role role, uint32_t inTemp, FILE *fpOut, ABYParty *party, ArithmeticCircuit *circ, uint32_t bitlen)
 {
     share *s_in;
     share *s_out;
-    if (role == SERVER)
-    {
-        s_in = circ->PutINGate(inTemp, bitlen, SERVER);
-    }
-    else if (role == CLIENT)
-    {
-        s_in = circ->PutDummyINGate(bitlen);
-    }
+    // printf("ok1 ");
+    s_in = circ->PutINGate(inTemp, bitlen, SERVER);
+    // printf("ok2 ");
     s_out = circ->PutSharedOUTGate(s_in); //一个share数据被shared输出，变成双方各持有一部分的加密明文数据
+    // printf("ok3 ");
     party->ExecCircuit();
     uint64_t int_shared = s_out->get_clear_value<uint64_t>();
+    // printf("ok4 ");
     fprintf(fpOut, "%lu\t", int_shared);
     party->Reset(); //重置电路
+    // printf("ok5\n");
 }
 
 //模拟用户输入，将明文数据转换为share数据，分发给两台服务器
 void userSim(e_role role, uint32_t dimension, std::string path, const std::string &address, uint16_t port,
              seclvl seclvl, uint32_t bitlen, uint32_t nthreads, e_mt_gen_alg mt_alg, e_sharing sharing)
 {
-    ABYParty *party = new ABYParty(role, address, port, seclvl, bitlen, nthreads, mt_alg);
-    std::vector<Sharing *> &sharings = party->GetSharings();
-    ArithmeticCircuit *circ = (ArithmeticCircuit *)sharings[sharing]->GetCircuitBuildRoutine();
+    // ABYParty *party = new ABYParty(role, address, port, seclvl, bitlen, nthreads, mt_alg);
+    // std::vector<Sharing *> &sharings = party->GetSharings();
+    // ArithmeticCircuit *circ = (ArithmeticCircuit *)sharings[sharing]->GetCircuitBuildRoutine();
     //输入文件
     char *pathPtr = const_cast<char *>(path.c_str());
     FILE *fpIn = fopen(pathPtr, "r");
@@ -53,28 +52,44 @@ void userSim(e_role role, uint32_t dimension, std::string path, const std::strin
         printf("error!\n");
         exit(0);
     }
-    std::cout << "running";
+    std::cout << "Encrypting" << std::endl;
     //输出文件
     std::string fileName = role ? BOB : ALICE;
     char *namePtr = const_cast<char *>(fileName.c_str());
     FILE *fpOut = fopen(namePtr, "w");
     int inTemp;
+    int counts = 0;
+    int times = 10000;
     //读入数据
+    ABYParty *party;
+    ArithmeticCircuit *circ;
     while (fscanf(fpIn, "%d", &inTemp) != EOF)
     {
+        if (counts % times == 0)
+        {
+            party = new ABYParty(role, address, port, seclvl, bitlen, nthreads, mt_alg);
+            std::vector<Sharing *> &sharings = party->GetSharings();
+            circ = (ArithmeticCircuit *)sharings[sharing]->GetCircuitBuildRoutine();
+        }
         aby(role, inTemp, fpOut, party, circ, bitlen);
+        // printf("ok1 ");
+        fflush(stdout);
         for (int indexJ = 1; indexJ < dimension; indexJ++)
         {
             fscanf(fpIn, "%d", &inTemp);
             aby(role, inTemp, fpOut, party, circ, bitlen);
+            // printf("ok2\n");
         }
         fprintf(fpOut, "\n");
-        std::cout << "░" << std::flush; //进度条
+        std::cout << "\rNo." << ++counts << std::flush; //进度条
+        // std::cout << "." << std::flush; //进度条
+        if (counts % times == 0)
+            delete party;
     }
     fclose(fpIn);
     fclose(fpOut);
     printf("\nfinished!\n");
-    delete party;
+    // delete party;
 }
 
 //读取参数
