@@ -360,7 +360,6 @@ void kmeans(e_role role, uint32_t dimension, uint32_t cluster, std::string path,
     //输出结果
     printf("\nPrinting...");
     fflush(stdout);
-    int index = 0;
     std::string fileName = role ? BOB : ALICE;
     char *namePtr = const_cast<char *>(fileName.c_str());
     FILE *fp = fopen(namePtr, "w");
@@ -373,7 +372,7 @@ void kmeans(e_role role, uint32_t dimension, uint32_t cluster, std::string path,
     for (int iL = 0; iL < list[0].size(); iL++)                   //对每个数
         for (int iC = 0; iC < cluster; iC++)                      //对每个簇
             if (classInfo[iL] == iC)                              //如果属于这个簇
-                fprintf(fp, "USER %d:\tCLASS %d\n", ++index, iC); //输出该数据点所属的簇编号
+                fprintf(fp, "USER %d:\tCLASS %d\n", iL+1, iC); //输出该数据点所属的簇编号
     fclose(fp);
     printf("Printing is complete!\n");
 }

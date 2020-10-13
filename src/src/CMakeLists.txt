@@ -7,6 +7,7 @@
 #add_subdirectory(temp)
 #add_subdirectory(userSimF)
 #add_subdirectory(userSim)
+add_subdirectory(kmeans)
 #add_subdirectory(kmeans1)
 #add_subdirectory(kmeans2)
 #add_subdirectory(kmeans3)
