@@ -18,7 +18,6 @@
 #define ALICE "ALICE"
 #define BOB "BOB"
 
-
 //将明文数据转换为share数据，并以加密的明文形式保存
 void aby(e_role role, uint32_t inTemp, FILE *fpOut, ABYParty *party, ArithmeticCircuit *circ, uint32_t bitlen)
 {
@@ -38,7 +37,7 @@ void aby(e_role role, uint32_t inTemp, FILE *fpOut, ABYParty *party, ArithmeticC
 }
 
 //模拟用户输入，将明文数据转换为share数据，分发给两台服务器
-void userSim(e_role role, uint32_t dimension, std::string path, const std::string &address, uint16_t port,
+void userSim(e_role role, uint32_t dimension, std::string path, uint32_t times, const std::string &address, uint16_t port,
              seclvl seclvl, uint32_t bitlen, uint32_t nthreads, e_mt_gen_alg mt_alg, e_sharing sharing)
 {
     // ABYParty *party = new ABYParty(role, address, port, seclvl, bitlen, nthreads, mt_alg);
@@ -59,7 +58,7 @@ void userSim(e_role role, uint32_t dimension, std::string path, const std::strin
     FILE *fpOut = fopen(namePtr, "w");
     int inTemp;
     int counts = 0;
-    int times = 10000;
+    // int times = 1000;
     //读入数据
     ABYParty *party;
     ArithmeticCircuit *circ;
@@ -95,21 +94,21 @@ void userSim(e_role role, uint32_t dimension, std::string path, const std::strin
 //读取参数
 void read_test_options(int32_t *argcp, char ***argvp, e_role *role, std::string *path, e_sharing *sharing,
                        uint32_t *dimension, uint32_t *bitlen, uint32_t *secparam, std::string *address,
-                       uint16_t *port, int32_t *test_op, uint32_t *test_bit)
+                       uint16_t *port, int32_t *test_op, uint32_t *times)
 {
-    uint32_t int_role = 0, int_port = 0, int_testbit = 0, int_dimension = 2, int_sharing = 2;
+    uint32_t int_role = 0, int_port = 0, int_testbit = 0, int_dimension = 2, int_sharing = 2, int_times = 10000;
     std::string str_path;
     parsing_ctx options[] =
         {{(void *)&int_role, T_NUM, "r", "Role: 0/1", true, false},
          {(void *)&str_path, T_STR, "f", "file path", true, false},
+         {(void *)&int_times, T_NUM, "t", "reset time", false, false},
          {(void *)&int_sharing, T_NUM, "w", "Sharing: BOOL/0 YAO/1 ARITH/2", false, false},
          {(void *)&int_dimension, T_NUM, "d", "dimension, default 2", false, false},
          {(void *)&int_testbit, T_NUM, "i", "test bit", false, false},
          {(void *)bitlen, T_NUM, "b", "Bit-length, default 32", false, false},
          {(void *)secparam, T_NUM, "s", "Symmetric Security Bits, default: 128", false, false},
          {(void *)address, T_STR, "a", "IP-address, default: localhost", false, false},
-         {(void *)&int_port, T_NUM, "p", "Port, default: 7766", false, false},
-         {(void *)test_op, T_NUM, "t", "Single test (leave out for all operations), default: off", false, false}};
+         {(void *)&int_port, T_NUM, "p", "Port, default: 7766", false, false}};
     if (!parse_options(argcp, argvp, options,
                        sizeof(options) / sizeof(parsing_ctx)))
     {
@@ -125,8 +124,8 @@ void read_test_options(int32_t *argcp, char ***argvp, e_role *role, std::string 
         *port = (uint16_t)int_port;
     }
     *path = str_path;
-    *test_bit = int_testbit;
     *dimension = int_dimension;
+    *times = int_times;
     switch (int_sharing)
     {
     case 0:
@@ -153,13 +152,13 @@ int main(int argc, char **argv)
     std::string address = "127.0.0.1";
     int32_t test_op = -1;
     e_mt_gen_alg mt_alg = MT_OT;
-    uint32_t test_bit = 0, dimension = 2;
+    uint32_t test_bit = 0, dimension = 2, times = 10000;
     std::string path;
     seclvl seclvl = get_sec_lvl(secparam);
     e_sharing sharing = S_ARITH;
     read_test_options(&argc, &argv, &role, &path, &sharing, &dimension,
-                      &bitlen, &secparam, &address, &port, &test_op, &test_bit);
-    userSim(role, dimension, path, address, port, seclvl, bitlen, nthreads, mt_alg, sharing);
+                      &bitlen, &secparam, &address, &port, &test_op, &times);
+    userSim(role, dimension, path, times, address, port, seclvl, bitlen, nthreads, mt_alg, sharing);
     end = clock();
     clock_t remain = (double)(end - start) / CLOCKS_PER_SEC;
     std::cout << "Total time is " << remain / 60 << "m " << remain % 60 << "s" << std::endl;
